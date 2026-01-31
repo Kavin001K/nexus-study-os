@@ -1,56 +1,48 @@
 import { create } from 'zustand';
+import { nodesApi, roomsApi, activitiesApi, authApi } from '@/lib/api';
+import type { KnowledgeNode, GoalRoom, ActivityItem, User } from '@/lib/api';
 
-export interface KnowledgeNode {
-  id: string;
-  name: string;
-  subject: 'physics' | 'chemistry' | 'biology' | 'math' | 'history' | 'polity' | 'economics' | 'geography';
-  exam: 'jee' | 'neet' | 'upsc';
-  position: [number, number, number];
-  connections: string[];
-  contentCount: number;
-  status: 'green' | 'yellow' | 'red';
-}
-
-export interface ActivityItem {
-  id: string;
-  user: string;
-  action: string;
-  room: string;
-  timestamp: Date;
-}
-
-export interface GoalRoom {
-  id: string;
-  name: string;
-  exam: 'jee' | 'neet' | 'upsc';
-  memberCount: number;
-  contentCount: number;
-  activityLevel: 'high' | 'medium' | 'low';
-  description: string;
-}
+// Re-export types for convenience
+export type { KnowledgeNode, GoalRoom, ActivityItem, User };
 
 interface AppState {
   // UI State
   isCommandPaletteOpen: boolean;
   setCommandPaletteOpen: (open: boolean) => void;
-  
+
+  // Loading states
+  isLoading: boolean;
+  error: string | null;
+
   // Activity Feed
   activityFeed: ActivityItem[];
-  
+  fetchActivities: () => Promise<void>;
+
   // Knowledge Nodes (for 3D graph)
   knowledgeNodes: KnowledgeNode[];
   hoveredNode: string | null;
   setHoveredNode: (id: string | null) => void;
-  
+  fetchNodes: () => Promise<void>;
+
   // Goal Rooms
   goalRooms: GoalRoom[];
-  
-  // User
+  fetchRooms: () => Promise<void>;
+  joinRoom: (roomId: string) => Promise<void>;
+  leaveRoom: (roomId: string) => Promise<void>;
+
+  // User & Auth
+  user: User | null;
   isAuthenticated: boolean;
   setAuthenticated: (auth: boolean) => void;
+  login: (email: string, name: string, avatarUrl?: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  checkAuth: () => Promise<void>;
+
+  // Initialize app data
+  initializeData: () => Promise<void>;
 }
 
-// Mock data for the 3D knowledge graph
+// Fallback mock data (used if API fails)
 const mockNodes: KnowledgeNode[] = [
   { id: 'physics', name: 'Physics', subject: 'physics', exam: 'jee', position: [0, 0, 0], connections: ['math', 'chemistry'], contentCount: 156, status: 'green' },
   { id: 'chemistry', name: 'Chemistry', subject: 'chemistry', exam: 'jee', position: [3, 1, -1], connections: ['physics', 'biology'], contentCount: 134, status: 'green' },
@@ -63,39 +55,119 @@ const mockNodes: KnowledgeNode[] = [
 ];
 
 const mockActivity: ActivityItem[] = [
-  { id: '1', user: 'Priya', action: 'uploaded "Organic Chemistry Notes"', room: 'NEET Chemistry', timestamp: new Date(Date.now() - 120000) },
-  { id: '2', user: 'Arjun', action: 'completed Thermodynamics quiz', room: 'JEE Physics', timestamp: new Date(Date.now() - 300000) },
-  { id: '3', user: 'Neha', action: 'shared "Modern History Summary"', room: 'UPSC History', timestamp: new Date(Date.now() - 600000) },
-  { id: '4', user: 'Rahul', action: 'asked a question about Calculus', room: 'JEE Mathematics', timestamp: new Date(Date.now() - 900000) },
-  { id: '5', user: 'Ananya', action: 'uploaded "Cell Biology Diagrams"', room: 'NEET Biology', timestamp: new Date(Date.now() - 1200000) },
-  { id: '6', user: 'Vikram', action: 'earned "Top Contributor" badge', room: 'JEE Chemistry', timestamp: new Date(Date.now() - 1500000) },
-  { id: '7', user: 'Shreya', action: 'completed 7-day study streak', room: 'UPSC Polity', timestamp: new Date(Date.now() - 1800000) },
-  { id: '8', user: 'Aditya', action: 'posted bounty for "Krebs Cycle Mind Map"', room: 'NEET Biology', timestamp: new Date(Date.now() - 2100000) },
+  { id: '1', user: 'Priya', action: 'uploaded "Organic Chemistry Notes"', room: 'NEET Chemistry', timestamp: new Date(Date.now() - 120000).toISOString() },
+  { id: '2', user: 'Arjun', action: 'completed Thermodynamics quiz', room: 'JEE Physics', timestamp: new Date(Date.now() - 300000).toISOString() },
+  { id: '3', user: 'Neha', action: 'shared "Modern History Summary"', room: 'UPSC History', timestamp: new Date(Date.now() - 600000).toISOString() },
+  { id: '4', user: 'Rahul', action: 'asked a question about Calculus', room: 'JEE Mathematics', timestamp: new Date(Date.now() - 900000).toISOString() },
 ];
 
 const mockRooms: GoalRoom[] = [
   { id: 'jee-physics', name: 'JEE Physics', exam: 'jee', memberCount: 2847, contentCount: 1256, activityLevel: 'high', description: 'Mechanics, Thermodynamics, Electromagnetism' },
   { id: 'jee-chemistry', name: 'JEE Chemistry', exam: 'jee', memberCount: 2341, contentCount: 987, activityLevel: 'high', description: 'Organic, Inorganic, Physical Chemistry' },
-  { id: 'jee-math', name: 'JEE Mathematics', exam: 'jee', memberCount: 3102, contentCount: 1432, activityLevel: 'high', description: 'Calculus, Algebra, Coordinate Geometry' },
   { id: 'neet-biology', name: 'NEET Biology', exam: 'neet', memberCount: 4521, contentCount: 2145, activityLevel: 'high', description: 'Botany, Zoology, Human Physiology' },
-  { id: 'neet-chemistry', name: 'NEET Chemistry', exam: 'neet', memberCount: 3876, contentCount: 1567, activityLevel: 'medium', description: 'Organic Chemistry, Biochemistry' },
-  { id: 'upsc-history', name: 'UPSC History', exam: 'upsc', memberCount: 1234, contentCount: 678, activityLevel: 'medium', description: 'Ancient, Medieval, Modern India' },
-  { id: 'upsc-polity', name: 'UPSC Polity', exam: 'upsc', memberCount: 987, contentCount: 456, activityLevel: 'low', description: 'Constitution, Governance, International Relations' },
-  { id: 'upsc-geography', name: 'UPSC Geography', exam: 'upsc', memberCount: 1456, contentCount: 789, activityLevel: 'medium', description: 'Physical, Human, Indian Geography' },
 ];
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
+  // UI State
   isCommandPaletteOpen: false,
   setCommandPaletteOpen: (open) => set({ isCommandPaletteOpen: open }),
-  
+
+  // Loading
+  isLoading: false,
+  error: null,
+
+  // Activity Feed
   activityFeed: mockActivity,
-  
+  fetchActivities: async () => {
+    const response = await activitiesApi.getRecent(20);
+    if (response.data?.activities) {
+      set({ activityFeed: response.data.activities });
+    }
+  },
+
+  // Knowledge Nodes
   knowledgeNodes: mockNodes,
   hoveredNode: null,
   setHoveredNode: (id) => set({ hoveredNode: id }),
-  
+  fetchNodes: async () => {
+    const response = await nodesApi.getAll();
+    if (response.data?.nodes) {
+      set({ knowledgeNodes: response.data.nodes });
+    }
+  },
+
+  // Goal Rooms
   goalRooms: mockRooms,
-  
+  fetchRooms: async () => {
+    const response = await roomsApi.getAll();
+    if (response.data?.rooms) {
+      set({ goalRooms: response.data.rooms });
+    }
+  },
+  joinRoom: async (roomId) => {
+    const response = await roomsApi.join(roomId);
+    if (response.data?.room) {
+      // Update the room in the list
+      const rooms = get().goalRooms.map(r =>
+        r.id === roomId ? response.data!.room : r
+      );
+      set({ goalRooms: rooms });
+    }
+  },
+  leaveRoom: async (roomId) => {
+    const response = await roomsApi.leave(roomId);
+    if (response.data?.success) {
+      await get().fetchRooms();
+    }
+  },
+
+  // User & Auth
+  user: null,
   isAuthenticated: false,
   setAuthenticated: (auth) => set({ isAuthenticated: auth }),
+
+  login: async (email, name, avatarUrl) => {
+    set({ isLoading: true, error: null });
+    const response = await authApi.googleSignIn(email, name, avatarUrl);
+    if (response.data?.user) {
+      set({
+        user: response.data.user,
+        isAuthenticated: true,
+        isLoading: false
+      });
+      return true;
+    }
+    set({ error: response.error || 'Login failed', isLoading: false });
+    return false;
+  },
+
+  logout: async () => {
+    await authApi.logout();
+    set({ user: null, isAuthenticated: false });
+  },
+
+  checkAuth: async () => {
+    const response = await authApi.getCurrentUser();
+    if (response.data?.user) {
+      set({ user: response.data.user, isAuthenticated: true });
+    }
+  },
+
+  // Initialize
+  initializeData: async () => {
+    set({ isLoading: true });
+    try {
+      // Fetch all data in parallel
+      await Promise.all([
+        get().fetchNodes(),
+        get().fetchRooms(),
+        get().fetchActivities(),
+        get().checkAuth(),
+      ]);
+    } catch (error) {
+      console.error('Failed to initialize data:', error);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
 }));

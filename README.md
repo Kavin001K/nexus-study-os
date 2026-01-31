@@ -1,73 +1,47 @@
-# Welcome to your Lovable project
+# Nexus Study OS
 
-## Project info
+A premium, AI-powered collaborative study platform for JEE, NEET, and UPSC aspirants.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Tech Stack
 
-## How can I edit this code?
+- **Frontend**: React, Vite, Tailwind CSS, Shadcn UI, Three.js (R3F)
+- **Backend**: Express.js, TypeScript
+- **Database**: SQLite (better-sqlite3)
+- **State Management**: Zustand
 
-There are several ways of editing your application.
+## Getting Started
 
-**Use Lovable**
+1. **Install Dependencies**
+   ```bash
+   npm install
+   ```
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+2. **Start Development Server**
+   This will run both the frontend (8080) and backend (3001) concurrently.
+   ```bash
+   npm run dev
+   ```
 
-Changes made via Lovable will be committed automatically to this repo.
+3. **Open App**
+   Visit [http://localhost:8080](http://localhost:8080)
 
-**Use your preferred IDE**
+## Features implemented
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- **Full Stack Architecture**: Express backend with SQLite database
+- **Authentication**: Session-based auth with mock Google Sign-In
+- **Dashboard**: Glassmorphic dashboard with real-time stats
+- **3D Knowledge Graph**: Interactive 3D visualization of study topics
+- **Goal Rooms**: Collaborative study spaces
+- **Activity Feed**: Real-time tracking of user activities
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Project Structure
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- `src/` - Frontend React application
+  - `components/` - UI components
+  - `pages/` - Route pages (Landing, Dashboard)
+  - `store/` - Zustand state management
+  - `lib/api.ts` - API client
+- `server/` - Backend Express application
+  - `db/` - Database schema and setup
+  - `routes/` - API routes
+  - `services/` - Business logic

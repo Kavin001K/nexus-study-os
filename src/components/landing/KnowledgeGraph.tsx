@@ -15,18 +15,18 @@ const subjectColors: Record<string, string> = {
   geography: '#8b5cf6',
 };
 
-function KnowledgeNode({ 
-  node, 
-  isHovered, 
-  onHover 
-}: { 
-  node: any; 
+function KnowledgeNode({
+  node,
+  isHovered,
+  onHover
+}: {
+  node: any;
   isHovered: boolean;
   onHover: (id: string | null) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const color = subjectColors[node.subject] || '#60a5fa';
-  
+
   useFrame((state) => {
     if (meshRef.current) {
       meshRef.current.rotation.y += 0.002;
@@ -57,7 +57,7 @@ function KnowledgeNode({
             opacity={isHovered ? 1 : 0.85}
           />
         </mesh>
-        
+
         {/* Glow sphere */}
         <mesh scale={isHovered ? 1.8 : 1.2}>
           <sphereGeometry args={[0.5, 16, 16]} />
@@ -67,7 +67,7 @@ function KnowledgeNode({
             opacity={isHovered ? 0.15 : 0.05}
           />
         </mesh>
-        
+
         {/* Label */}
         <Text
           position={[0, -0.9, 0]}
@@ -75,11 +75,10 @@ function KnowledgeNode({
           color="white"
           anchorX="center"
           anchorY="middle"
-          font="/fonts/Inter-Medium.woff"
         >
           {node.name}
         </Text>
-        
+
         {/* Content count badge */}
         {isHovered && (
           <Text
@@ -101,7 +100,7 @@ function ConnectionLines({ nodes }: { nodes: any[] }) {
   const lines = useMemo(() => {
     const result: { start: [number, number, number]; end: [number, number, number] }[] = [];
     const processed = new Set<string>();
-    
+
     nodes.forEach(node => {
       node.connections.forEach((connId: string) => {
         const key = [node.id, connId].sort().join('-');
@@ -117,7 +116,7 @@ function ConnectionLines({ nodes }: { nodes: any[] }) {
         }
       });
     });
-    
+
     return result;
   }, [nodes]);
 
@@ -143,17 +142,17 @@ function ConnectionLines({ nodes }: { nodes: any[] }) {
 
 function ParticleField() {
   const particlesRef = useRef<THREE.Points>(null);
-  
+
   const particles = useMemo(() => {
     const count = 200;
     const positions = new Float32Array(count * 3);
-    
+
     for (let i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() - 0.5) * 20;
       positions[i * 3 + 1] = (Math.random() - 0.5) * 20;
       positions[i * 3 + 2] = (Math.random() - 0.5) * 20;
     }
-    
+
     return positions;
   }, []);
 
@@ -187,16 +186,16 @@ function ParticleField() {
 
 function Scene() {
   const { knowledgeNodes, hoveredNode, setHoveredNode } = useAppStore();
-  
+
   return (
     <>
       <ambientLight intensity={0.3} />
       <pointLight position={[10, 10, 10]} intensity={1} color="#60a5fa" />
       <pointLight position={[-10, -10, -10]} intensity={0.5} color="#a855f7" />
-      
+
       <ParticleField />
       <ConnectionLines nodes={knowledgeNodes} />
-      
+
       {knowledgeNodes.map((node) => (
         <KnowledgeNode
           key={node.id}
@@ -205,7 +204,7 @@ function Scene() {
           onHover={setHoveredNode}
         />
       ))}
-      
+
       <OrbitControls
         enableZoom={false}
         enablePan={false}
