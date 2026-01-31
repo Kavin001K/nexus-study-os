@@ -1,4 +1,4 @@
-import { useAppStore } from '@/store/useAppStore';
+import { useActivities } from '@/hooks/queries';
 import { formatDistanceToNow } from 'date-fns';
 import { Upload, Award, MessageSquare, CheckCircle, Flame } from 'lucide-react';
 
@@ -22,7 +22,8 @@ function getActionIcon(action: string) {
 }
 
 export function ActivityTicker() {
-  const { activityFeed } = useAppStore();
+  const { data } = useActivities(20);
+  const activityFeed = Array.isArray(data) ? data : [];
 
   // Duplicate the feed for seamless loop
   const duplicatedFeed = [...activityFeed, ...activityFeed];

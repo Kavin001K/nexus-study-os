@@ -12,7 +12,7 @@ const KnowledgeGraph = lazy(() => import('@/components/landing/KnowledgeGraph').
 
 export default function Landing() {
   const { setCommandPaletteOpen } = useAppStore();
-  const [show3D, setShow3D] = useState(true);
+  const [show3D, setShow3D] = useState(false);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">

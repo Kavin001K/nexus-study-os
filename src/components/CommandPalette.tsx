@@ -9,6 +9,7 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command';
+import { useRooms } from '@/hooks/queries';
 import { useAppStore } from '@/store/useAppStore';
 import {
   Search,
@@ -25,7 +26,8 @@ import {
 } from 'lucide-react';
 
 export function CommandPalette() {
-  const { isCommandPaletteOpen, setCommandPaletteOpen, goalRooms } = useAppStore();
+  const { isCommandPaletteOpen, setCommandPaletteOpen } = useAppStore();
+  const { data: goalRooms = [] } = useRooms();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export function CommandPalette() {
       <CommandInput placeholder="Type a command or search..." />
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
-        
+
         <CommandGroup heading="Navigation">
           <CommandItem onSelect={() => runCommand(() => navigate('/'))}>
             <Home className="mr-2 h-4 w-4" />
