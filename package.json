@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "start": "bun run server/index.ts",
+    "start": "tsx server/index.ts",
     "start:backend": "tsx server/index.ts"
   },
   "dependencies": {
