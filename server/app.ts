@@ -20,6 +20,7 @@ const app = express();
 // Initialize database is now handled in server/index.ts
 
 // Middleware
+app.set('trust proxy', 1); // Trust first proxy (Render/Heroku/AWS)
 app.use(securityHeaders);
 app.use(cors({
     origin: ['http://localhost:8080', 'http://localhost:5173', 'http://[::]:8080', 'https://nexus-lzjp.onrender.com'],
