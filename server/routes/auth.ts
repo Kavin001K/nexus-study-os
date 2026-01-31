@@ -2,19 +2,20 @@ import { Router } from 'express';
 import * as auth from '../services/auth.js';
 import type { Request, Response } from 'express';
 
+import { authLimiter, validate } from '../middleware/security.js';
+import { loginSchema, updateProfileSchema } from '../schemas/index.js';
+
 const router = Router();
 
 // Mock Google Sign-In (simulates OAuth flow)
-router.post('/google', (req: Request, res: Response) => {
+router.post('/google', authLimiter, validate(loginSchema), async (req: Request, res: Response) => {
     const { email, name, avatarUrl } = req.body;
 
-    if (!email || !name) {
-        return res.status(400).json({ error: 'Email and name are required' });
-    }
+    // Validation handled by Zod middleware
 
     try {
-        const user = auth.createOrGetUser(email, name, avatarUrl);
-        const session = auth.createSession(user.id);
+        const user = await auth.createOrGetUser(email, name, avatarUrl);
+        const session = await auth.createSession(user.id);
 
         // Set session cookie
         res.cookie('session', session.sessionId, {
@@ -32,29 +33,34 @@ router.post('/google', (req: Request, res: Response) => {
 });
 
 // Get current user (from session)
-router.get('/me', (req: Request, res: Response) => {
+router.get('/me', async (req: Request, res: Response) => {
     const sessionId = req.cookies?.session;
 
     if (!sessionId) {
         return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const user = auth.validateSession(sessionId);
+    try {
+        const user = await auth.validateSession(sessionId);
 
-    if (!user) {
-        res.clearCookie('session');
-        return res.status(401).json({ error: 'Session expired or invalid' });
+        if (!user) {
+            res.clearCookie('session');
+            return res.status(401).json({ error: 'Session expired or invalid' });
+        }
+
+        return res.json({ user });
+    } catch (error) {
+        console.error('Session validation error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
     }
-
-    return res.json({ user });
 });
 
 // Logout
-router.post('/logout', (req: Request, res: Response) => {
+router.post('/logout', async (req: Request, res: Response) => {
     const sessionId = req.cookies?.session;
 
     if (sessionId) {
-        auth.deleteSession(sessionId);
+        await auth.deleteSession(sessionId);
     }
 
     res.clearCookie('session');
@@ -62,28 +68,33 @@ router.post('/logout', (req: Request, res: Response) => {
 });
 
 // Update profile
-router.patch('/profile', (req: Request, res: Response) => {
+router.patch('/profile', validate(updateProfileSchema), async (req: Request, res: Response) => {
     const sessionId = req.cookies?.session;
 
     if (!sessionId) {
         return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const user = auth.validateSession(sessionId);
-    if (!user) {
-        res.clearCookie('session');
-        return res.status(401).json({ error: 'Session expired' });
+    try {
+        const user = await auth.validateSession(sessionId);
+        if (!user) {
+            res.clearCookie('session');
+            return res.status(401).json({ error: 'Session expired' });
+        }
+
+        const { name, avatarUrl } = req.body;
+        const updated = await auth.updateUser(user.id, { name, avatarUrl });
+
+        if (!updated) {
+            return res.status(400).json({ error: 'No changes made' });
+        }
+
+        const updatedUser = await auth.getUserById(user.id);
+        return res.json({ user: updatedUser });
+    } catch (error) {
+        console.error('Profile update error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
     }
-
-    const { name, avatarUrl } = req.body;
-    const updated = auth.updateUser(user.id, { name, avatarUrl });
-
-    if (!updated) {
-        return res.status(400).json({ error: 'No changes made' });
-    }
-
-    const updatedUser = auth.getUserById(user.id);
-    return res.json({ user: updatedUser });
 });
 
 export default router;

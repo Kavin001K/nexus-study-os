@@ -184,8 +184,11 @@ function ParticleField() {
   );
 }
 
+import { useNodes } from '@/hooks/queries';
+
 function Scene() {
-  const { knowledgeNodes, hoveredNode, setHoveredNode } = useAppStore();
+  const { data: knowledgeNodes = [] } = useNodes();
+  const { hoveredNode, setHoveredNode } = useAppStore();
 
   return (
     <>

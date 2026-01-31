@@ -1,13 +1,15 @@
 import { Router } from 'express';
 import * as nodes from '../services/nodes.js';
 import type { Request, Response } from 'express';
+import { validate } from '../middleware/security.js';
+import { examParamSchema, nodeParamSchema, updateNodeStatusSchema } from '../schemas/index.js';
 
 const router = Router();
 
 // Get all knowledge nodes
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', async (_req: Request, res: Response) => {
     try {
-        const allNodes = nodes.getAllNodes();
+        const allNodes = await nodes.getAllNodes();
         return res.json({ nodes: allNodes });
     } catch (error) {
         console.error('Error fetching nodes:', error);
@@ -16,15 +18,13 @@ router.get('/', (_req: Request, res: Response) => {
 });
 
 // Get nodes by exam
-router.get('/exam/:exam', (req: Request, res: Response) => {
-    const { exam } = req.params;
+router.get('/exam/:exam', validate(examParamSchema), async (req: Request, res: Response) => {
+    const exam = req.params.exam as string;
 
-    if (!['jee', 'neet', 'upsc'].includes(exam)) {
-        return res.status(400).json({ error: 'Invalid exam type' });
-    }
+    // Zod middleware handles validation
 
     try {
-        const examNodes = nodes.getNodesByExam(exam);
+        const examNodes = await nodes.getNodesByExam(exam);
         return res.json({ nodes: examNodes });
     } catch (error) {
         console.error('Error fetching nodes:', error);
@@ -33,11 +33,11 @@ router.get('/exam/:exam', (req: Request, res: Response) => {
 });
 
 // Get single node
-router.get('/:id', (req: Request, res: Response) => {
-    const { id } = req.params;
+router.get('/:id', validate(nodeParamSchema), async (req: Request, res: Response) => {
+    const id = req.params.id as string;
 
     try {
-        const node = nodes.getNodeById(id);
+        const node = await nodes.getNodeById(id);
         if (!node) {
             return res.status(404).json({ error: 'Node not found' });
         }
@@ -49,16 +49,14 @@ router.get('/:id', (req: Request, res: Response) => {
 });
 
 // Update node status
-router.patch('/:id/status', (req: Request, res: Response) => {
-    const { id } = req.params;
+router.patch('/:id/status', validate(updateNodeStatusSchema), async (req: Request, res: Response) => {
+    const id = req.params.id as string;
     const { status } = req.body;
 
-    if (!['green', 'yellow', 'red'].includes(status)) {
-        return res.status(400).json({ error: 'Invalid status' });
-    }
+    // Zod middleware handles validation
 
     try {
-        const updated = nodes.updateNodeStatus(id, status);
+        const updated = await nodes.updateNodeStatus(id, status);
         if (!updated) {
             return res.status(404).json({ error: 'Node not found' });
         }

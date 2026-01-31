@@ -1,4 +1,5 @@
 import { useAppStore } from '@/store/useAppStore';
+import { useActivities, useNodes, useRooms } from '@/hooks/queries';
 import { Activity, Users, BookOpen, TrendingUp, ArrowUpRight } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -14,12 +15,14 @@ const data = [
 ];
 
 export function Overview() {
-    const { goalRooms, knowledgeNodes, activityFeed } = useAppStore();
+    const { data: activities = [] } = useActivities();
+    const { data: nodes = [] } = useNodes();
+    const { data: rooms = [] } = useRooms();
 
     // Calculate stats
     const totalStudyHours = 32.4; // Mock
     const activeStreak = 5; // Mock
-    const totalResources = knowledgeNodes.reduce((acc, node) => acc + node.contentCount, 0);
+    const totalResources = nodes.reduce((acc, node) => acc + node.contentCount, 0);
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -88,7 +91,7 @@ export function Overview() {
                 <div className="glass-panel p-6 border border-border/30 flex flex-col">
                     <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
                     <div className="flex-1 overflow-y-auto pr-2 space-y-4 max-h-[300px] scrollbar-thin">
-                        {activityFeed.slice(0, 6).map((item) => (
+                        {activities.slice(0, 6).map((item) => (
                             <div key={item.id} className="flex gap-3 items-start pb-3 border-b border-border/20 last:border-0">
                                 <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0 text-xs font-bold">
                                     {item.user.charAt(0)}
@@ -117,7 +120,7 @@ export function Overview() {
                     </Button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {goalRooms.slice(0, 3).map((room) => (
+                    {rooms.slice(0, 3).map((room) => (
                         <div key={room.id} className="glass-card p-5 hover:border-primary/50 transition-colors group cursor-pointer">
                             <div className="flex justify-between items-start mb-3">
                                 <span className={`px-2 py-1 rounded-md text-xs font-medium bg-secondary text-secondary-foreground`}>

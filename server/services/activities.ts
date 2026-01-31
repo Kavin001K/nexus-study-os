@@ -1,4 +1,5 @@
-import db, { generateId } from '../db/database.js';
+import db from '../db/index.js';
+import { generateId } from '../db/database.js';
 
 export interface ActivityItem {
     id: string;
@@ -15,40 +16,34 @@ interface DBActivity {
     action: string;
     room_id: string | null;
     room_name: string | null;
-    created_at: string;
+    created_at: string | Date;
 }
 
-export function getRecentActivities(limit: number = 20): ActivityItem[] {
-    const activities = db.prepare(`
+export async function getRecentActivities(limit: number = 20): Promise<ActivityItem[]> {
+    const result = await db.query(`
     SELECT id, user_id, user_name, action, room_id, room_name, created_at
     FROM activities
     ORDER BY created_at DESC
     LIMIT ?
-  `).all(limit) as DBActivity[];
+  `, [limit]);
 
-    return activities.map(activity => ({
-        id: activity.id,
-        user: activity.user_name,
-        action: activity.action,
-        room: activity.room_name || 'General',
-        timestamp: new Date(activity.created_at),
-    }));
+    return result.rows.map(mapDBActivity);
 }
 
-export function createActivity(
+export async function createActivity(
     userId: string,
     userName: string,
     action: string,
     roomId?: string,
     roomName?: string
-): ActivityItem {
+): Promise<ActivityItem> {
     const id = generateId();
     const now = new Date();
 
-    db.prepare(`
+    await db.query(`
     INSERT INTO activities (id, user_id, user_name, action, room_id, room_name, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, userId, userName, action, roomId || null, roomName || null, now.toISOString());
+  `, [id, userId, userName, action, roomId || null, roomName || null, now.toISOString()]);
 
     return {
         id,
@@ -59,47 +54,48 @@ export function createActivity(
     };
 }
 
-export function getActivitiesByUser(userId: string, limit: number = 50): ActivityItem[] {
-    const activities = db.prepare(`
+export async function getActivitiesByUser(userId: string, limit: number = 50): Promise<ActivityItem[]> {
+    const result = await db.query(`
     SELECT id, user_id, user_name, action, room_id, room_name, created_at
     FROM activities
     WHERE user_id = ?
     ORDER BY created_at DESC
     LIMIT ?
-  `).all(userId, limit) as DBActivity[];
+  `, [userId, limit]);
 
-    return activities.map(activity => ({
-        id: activity.id,
-        user: activity.user_name,
-        action: activity.action,
-        room: activity.room_name || 'General',
-        timestamp: new Date(activity.created_at),
-    }));
+    return result.rows.map(mapDBActivity);
 }
 
-export function getActivitiesByRoom(roomId: string, limit: number = 50): ActivityItem[] {
-    const activities = db.prepare(`
+export async function getActivitiesByRoom(roomId: string, limit: number = 50): Promise<ActivityItem[]> {
+    const result = await db.query(`
     SELECT id, user_id, user_name, action, room_id, room_name, created_at
     FROM activities
     WHERE room_id = ?
     ORDER BY created_at DESC
     LIMIT ?
-  `).all(roomId, limit) as DBActivity[];
+  `, [roomId, limit]);
 
-    return activities.map(activity => ({
+    return result.rows.map(mapDBActivity);
+}
+
+// Cleanup old activities (older than 7 days)
+export async function cleanupOldActivities(): Promise<number> {
+    // Generate ISO string for 7 days ago to be compatible with both
+    const cutoffDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const result = await db.query(`
+    DELETE FROM activities
+    WHERE created_at < ?
+  `, [cutoffDate]);
+    return result.rowCount;
+}
+
+function mapDBActivity(activity: DBActivity): ActivityItem {
+    return {
         id: activity.id,
         user: activity.user_name,
         action: activity.action,
         room: activity.room_name || 'General',
         timestamp: new Date(activity.created_at),
-    }));
-}
-
-// Cleanup old activities (older than 7 days)
-export function cleanupOldActivities(): number {
-    const result = db.prepare(`
-    DELETE FROM activities
-    WHERE created_at < datetime('now', '-7 days')
-  `).run();
-    return result.changes;
+    };
 }

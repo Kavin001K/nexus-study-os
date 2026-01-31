@@ -177,3 +177,51 @@ A premium, macOS-inspired collaborative study platform that transforms exam prep
 - AI answers cite real community content
 - Feels like a "desktop app" not a website
 
+---
+
+## Phase 7: The Evolution to Production (Real-Time & Hardening)
+*Executive Summary*: Transitioning from a Monolithic MVP to a scalable, real-time, production-ready system.
+
+### 7.1 Real-Time Architecture (The Nervous System) ✅
+- [x] **Backend Refactor**: Separate HTTP server and Socket.io instance.
+- [x] **Socket.io Integration**:
+  - Presence (User connected/online/offline)
+  - Room channels (`room:join`, `room:leave`)
+  - Real-time Activity Feed broadcasts (`activity:new`)
+  - Collaborative Graph Editing (`node:move`)
+- [x] **Frontend Hooks**: `useSocket` hook for event listening outside Zustand.
+- [x] **State Optimization**: Optimistic updates in Zustand/Query.
+
+### 7.2 Production Database & Backend Hardening ✅
+- [x] **Migration**: Move from SQLite (`better-sqlite3`) to PostgreSQL.
+  - [x] Hybrid Adapter (`db/index.ts`) for Dev/Prod switching.
+  - [x] Async Service Layer Refactor.
+  - [x] Production Schema (`schema.postgres.sql`).
+- [x] **Security**:
+  - [x] `express-rate-limit` to prevent spam.
+  - [x] `helmet` for HTTP headers security.
+  - [x] Strict CORS for production domain.
+  - [x] Zod middleware for input validation on all routes.
+
+### 7.3 Frontend Architecture & Performance ✅
+- [x] **TanStack Query (React Query)**:
+  - Replace manual fetch logic in Zustand with `useQuery`/`useMutation`.
+  - Implement Optimistic UI updates.
+  - Better caching and stale-time management.
+- [x] **Code Splitting**:
+  - Lazy load heavy components (Dashboard, Three.js Graph).
+  - Reduce initial bundle size.
+
+### 7.4 UI/UX Masterclass ✅
+- [x] **Optimistic UI**: Instant feedback on actions (e.g., Join Room) before server response.
+- [x] **3D Graph Usability**:
+  - [x] toggle 2D/3D views (List Mode).
+  - [x] Accessible list view alternative.
+- [x] **Mobile Experience**: Bottom navigation bar (`MobileNav`), larger touch targets.
+- [x] **Visual Polish**: Refined glassmorphism (performance checked) and contrast accessibility.
+
+### 7.5 DevOps & Deployment ✅
+- [x] **Dockerization**: Create `Dockerfile` for consistent production environment.
+- [x] **CI/CD**: GitHub Actions (`.github/workflows/ci.yml`) for automated testing and building.
+- [x] **Process Management**: Use PM2 (`ecosystem.config.cjs`) for production monitoring.
+

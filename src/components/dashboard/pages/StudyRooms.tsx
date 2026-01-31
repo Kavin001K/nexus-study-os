@@ -1,9 +1,10 @@
-import { useAppStore } from '@/store/useAppStore';
+import { useRooms, useJoinRoom } from '@/hooks/queries';
 import { Users, BookOpen, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function StudyRooms() {
-    const { goalRooms, joinRoom } = useAppStore();
+    const { data: rooms = [] } = useRooms();
+    const { mutate: joinRoom } = useJoinRoom();
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -18,7 +19,7 @@ export function StudyRooms() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {goalRooms.map((room) => (
+                {rooms.map((room) => (
                     <div key={room.id} className="glass-card p-6 hover:border-primary/50 transition-all duration-300 group">
                         <div className="flex justify-between items-start mb-4">
                             <span className="px-3 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground uppercase tracking-wider">
@@ -29,7 +30,7 @@ export function StudyRooms() {
                                     room.activityLevel === 'medium' ? 'text-yellow-400 border-yellow-500/20' : 'text-blue-400 border-blue-500/20'}
               `}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${room.activityLevel === 'high' ? 'bg-green-400 animate-pulse' :
-                                        room.activityLevel === 'medium' ? 'bg-yellow-400' : 'bg-blue-400'}
+                                    room.activityLevel === 'medium' ? 'bg-yellow-400' : 'bg-blue-400'}
                 `} />
                                 {room.activityLevel.toUpperCase()} ACTIVITY
                             </div>

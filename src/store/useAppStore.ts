@@ -10,25 +10,13 @@ interface AppState {
   isCommandPaletteOpen: boolean;
   setCommandPaletteOpen: (open: boolean) => void;
 
-  // Loading states
+  // Loading states (Auth only)
   isLoading: boolean;
   error: string | null;
 
-  // Activity Feed
-  activityFeed: ActivityItem[];
-  fetchActivities: () => Promise<void>;
-
-  // Knowledge Nodes (for 3D graph)
-  knowledgeNodes: KnowledgeNode[];
+  // Knowledge Nodes UI State (Selection only)
   hoveredNode: string | null;
   setHoveredNode: (id: string | null) => void;
-  fetchNodes: () => Promise<void>;
-
-  // Goal Rooms
-  goalRooms: GoalRoom[];
-  fetchRooms: () => Promise<void>;
-  joinRoom: (roomId: string) => Promise<void>;
-  leaveRoom: (roomId: string) => Promise<void>;
 
   // User & Auth
   user: User | null;
@@ -76,50 +64,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  // Activity Feed
-  activityFeed: mockActivity,
-  fetchActivities: async () => {
-    const response = await activitiesApi.getRecent(20);
-    if (response.data?.activities) {
-      set({ activityFeed: response.data.activities });
-    }
-  },
-
-  // Knowledge Nodes
-  knowledgeNodes: mockNodes,
+  // Knowledge Nodes UI State (Selection only)
   hoveredNode: null,
   setHoveredNode: (id) => set({ hoveredNode: id }),
-  fetchNodes: async () => {
-    const response = await nodesApi.getAll();
-    if (response.data?.nodes) {
-      set({ knowledgeNodes: response.data.nodes });
-    }
-  },
-
-  // Goal Rooms
-  goalRooms: mockRooms,
-  fetchRooms: async () => {
-    const response = await roomsApi.getAll();
-    if (response.data?.rooms) {
-      set({ goalRooms: response.data.rooms });
-    }
-  },
-  joinRoom: async (roomId) => {
-    const response = await roomsApi.join(roomId);
-    if (response.data?.room) {
-      // Update the room in the list
-      const rooms = get().goalRooms.map(r =>
-        r.id === roomId ? response.data!.room : r
-      );
-      set({ goalRooms: rooms });
-    }
-  },
-  leaveRoom: async (roomId) => {
-    const response = await roomsApi.leave(roomId);
-    if (response.data?.success) {
-      await get().fetchRooms();
-    }
-  },
 
   // User & Auth
   user: null,
@@ -153,19 +100,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  // Initialize
+  // Initialize app data (Auth only now)
   initializeData: async () => {
     set({ isLoading: true });
     try {
-      // Fetch all data in parallel
-      await Promise.all([
-        get().fetchNodes(),
-        get().fetchRooms(),
-        get().fetchActivities(),
-        get().checkAuth(),
-      ]);
+      await get().checkAuth();
     } catch (error) {
-      console.error('Failed to initialize data:', error);
+      console.error('Failed to initialize auth:', error);
     } finally {
       set({ isLoading: false });
     }

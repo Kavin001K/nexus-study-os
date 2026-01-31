@@ -1,99 +1,109 @@
-import express from 'express';
-import cors from 'cors';
-import cookieParser from 'cookie-parser';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { initializeDatabase } from './db/database.js';
-import { cleanupExpiredSessions } from './services/auth.js';
-import { cleanupOldActivities } from './services/activities.js';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import app from './app.js';
 
-// Routes
-import authRoutes from './routes/auth.js';
-import nodesRoutes from './routes/nodes.js';
-import roomsRoutes from './routes/rooms.js';
-import activitiesRoutes from './routes/activities.js';
-
-const app = express();
 const PORT = process.env.PORT || 3001;
+const httpServer = createServer(app);
 
-// Initialize database
-initializeDatabase();
-
-// Middleware
-app.use(cors({
-    origin: ['http://localhost:8080', 'http://localhost:5173', 'http://[::]:8080'],
-    credentials: true,
-}));
-app.use(express.json());
-app.use(cookieParser());
-
-// Request logging (development)
-app.use((req, _res, next) => {
-    console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
-    next();
+const io = new Server(httpServer, {
+    cors: {
+        origin: [
+            'http://localhost:8080',
+            'http://localhost:5173',
+            'http://[::]:8080',
+            'https://nexus-lzjp.onrender.com',
+            process.env.CLIENT_URL || ''
+        ].filter(Boolean),
+        credentials: true
+    }
 });
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/nodes', nodesRoutes);
-app.use('/api/rooms', roomsRoutes);
-app.use('/api/activities', activitiesRoutes);
+// Store active users mapped to socket IDs
+// In production with multiple instances, use Redis Adapter
+const activeUsers = new Map<string, string>();
 
-// Health check
-app.get('/api/health', (_req, res) => {
-    res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        database: 'sqlite',
-        mode: process.env.NODE_ENV || 'development'
+io.on('connection', (socket) => {
+    console.log(`User connected: ${socket.id}`);
+
+    // Authentication Handshake (Simplified)
+    // Client should send { auth: { userId: '...' } }
+    const userId = socket.handshake.auth.userId as string | undefined;
+
+    if (userId) {
+        activeUsers.set(userId, socket.id);
+        socket.join(`user:${userId}`); // Personal channel
+
+        // Broadcast online status
+        socket.broadcast.emit('presence:update', { userId, status: 'online' });
+        console.log(`User ${userId} is online`);
+    }
+
+    // Room Logic
+    socket.on('room:join', (roomId) => {
+        socket.join(`room:${roomId}`);
+        console.log(`User ${userId || socket.id} joined room ${roomId}`);
+        if (userId) {
+            socket.to(`room:${roomId}`).emit('room:user_joined', { userId });
+        }
+    });
+
+    socket.on('room:leave', (roomId) => {
+        socket.leave(`room:${roomId}`);
+        console.log(`User ${userId || socket.id} left room ${roomId}`);
+        if (userId) {
+            socket.to(`room:${roomId}`).emit('room:user_left', { userId });
+        }
+    });
+
+    // Real-time Activity Feed
+    socket.on('activity:new', (activityData) => {
+        // Broadcast to everyone
+        // In future: broadcast only to relevant rooms/users
+        socket.broadcast.emit('activity:feed_update', activityData);
+    });
+
+    // Collaborative Graph Modeling
+    socket.on('node:move', (data) => {
+        // Broadcast node position updates to everyone except sender
+        socket.broadcast.emit('node:moved', data);
+    });
+
+    socket.on('disconnect', () => {
+        console.log(`User disconnected: ${socket.id}`);
+        if (userId) {
+            activeUsers.delete(userId);
+            io.emit('presence:update', { userId, status: 'offline' });
+        }
     });
 });
 
-// Error handling
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    console.error('Server error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-});
+import { initializeDatabase } from './db/index.js';
+import { startCleanupTasks } from './cron.js';
 
-// Serve static files in production
-const DIST_PATH = path.join(process.cwd(), 'dist');
+const startServer = async () => {
+    try {
+        await initializeDatabase();
 
-if (process.env.NODE_ENV === 'production' || process.env.SERVE_STATIC === 'true') {
-    app.use(express.static(DIST_PATH));
-}
-
-// 404 handler (API only)
-app.use('/api/*', (_req, res) => {
-    res.status(404).json({ error: 'API endpoint not found' });
-});
-
-// SPA Fallback - serve index.html for any other route
-if (process.env.NODE_ENV === 'production' || process.env.SERVE_STATIC === 'true') {
-    app.get('*', (_req, res) => {
-        res.sendFile(path.join(DIST_PATH, 'index.html'));
-    });
-}
-
-
-// Cleanup tasks (run every 10 minutes)
-setInterval(() => {
-    console.log('Running cleanup tasks...');
-    const expiredSessions = cleanupExpiredSessions();
-    const oldActivities = cleanupOldActivities();
-    console.log(`Cleaned up: ${expiredSessions} sessions, ${oldActivities} activities`);
-}, 10 * 60 * 1000);
-
-// Start server
-app.listen(PORT, () => {
-    console.log(`
+        httpServer.listen(PORT, () => {
+            const dbType = process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite';
+            console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
 ║                    🚀 Nexus Study OS API                       ║
+║                ⚡ Real-Time Server Active ⚡                   ║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  Server running at http://localhost:${PORT}                      ║
-║  Database: SQLite (server/db/nexus.db)                        ║
+║  Database: ${dbType.padEnd(51)}║
 ║  Mode: ${(process.env.NODE_ENV || 'development').padEnd(51)}║
 ╚═══════════════════════════════════════════════════════════════╝
-  `);
-});
+            `);
 
-export default app;
+            // Start background tasks
+            startCleanupTasks();
+        });
+    } catch (err) {
+        console.error('Failed to start server:', err);
+        process.exit(1);
+    }
+};
+
+startServer();

@@ -1,96 +1,138 @@
-import db, { generateId } from '../db/database.js';
+import db from '../db/index.js';
+import { generateId } from '../db/database.js';
 
 export interface KnowledgeNode {
-    id: string;
-    name: string;
-    subject: 'physics' | 'chemistry' | 'biology' | 'math' | 'history' | 'polity' | 'economics' | 'geography';
-    exam: 'jee' | 'neet' | 'upsc';
-    position: [number, number, number];
-    connections: string[];
-    contentCount: number;
-    status: 'green' | 'yellow' | 'red';
+  id: string;
+  name: string;
+  subject: 'physics' | 'chemistry' | 'biology' | 'math' | 'history' | 'polity' | 'economics' | 'geography';
+  exam: 'jee' | 'neet' | 'upsc';
+  position: [number, number, number];
+  connections: string[];
+  contentCount: number;
+  status: 'green' | 'yellow' | 'red';
 }
 
 interface DBNode {
-    id: string;
-    name: string;
-    subject: string;
-    exam: string;
-    position_x: number;
-    position_y: number;
-    position_z: number;
-    content_count: number;
-    status: string;
+  id: string;
+  name: string;
+  subject: string;
+  exam: string;
+  position_x: number;
+  position_y: number;
+  position_z: number;
+  content_count: number;
+  status: string;
 }
 
-export function getAllNodes(): KnowledgeNode[] {
-    const nodes = db.prepare(`
+export async function getAllNodes(): Promise<KnowledgeNode[]> {
+  const nodesResult = await db.query(`
     SELECT id, name, subject, exam, position_x, position_y, position_z, content_count, status
     FROM knowledge_nodes
-  `).all() as DBNode[];
+  `);
+  const nodes = nodesResult.rows as DBNode[];
 
-    const connections = db.prepare(`
+  const connectionsResult = await db.query(`
     SELECT from_node_id, to_node_id FROM node_connections
-  `).all() as { from_node_id: string; to_node_id: string }[];
+  `);
+  const connections = connectionsResult.rows as { from_node_id: string; to_node_id: string }[];
 
-    const connectionMap = new Map<string, string[]>();
-    for (const conn of connections) {
-        if (!connectionMap.has(conn.from_node_id)) {
-            connectionMap.set(conn.from_node_id, []);
-        }
-        connectionMap.get(conn.from_node_id)!.push(conn.to_node_id);
+  const connectionMap = new Map<string, string[]>();
+  for (const conn of connections) {
+    if (!connectionMap.has(conn.from_node_id)) {
+      connectionMap.set(conn.from_node_id, []);
     }
+    connectionMap.get(conn.from_node_id)!.push(conn.to_node_id);
+  }
 
-    return nodes.map(node => ({
-        id: node.id,
-        name: node.name,
-        subject: node.subject as KnowledgeNode['subject'],
-        exam: node.exam as KnowledgeNode['exam'],
-        position: [node.position_x, node.position_y, node.position_z] as [number, number, number],
-        connections: connectionMap.get(node.id) || [],
-        contentCount: node.content_count,
-        status: node.status as KnowledgeNode['status'],
-    }));
+  return nodes.map(node => ({
+    id: node.id,
+    name: node.name,
+    subject: node.subject as KnowledgeNode['subject'],
+    exam: node.exam as KnowledgeNode['exam'],
+    position: [node.position_x, node.position_y, node.position_z] as [number, number, number],
+    connections: connectionMap.get(node.id) || [],
+    contentCount: node.content_count,
+    status: node.status as KnowledgeNode['status'],
+  }));
 }
 
-export function getNodeById(id: string): KnowledgeNode | null {
-    const node = db.prepare(`
+export async function getNodeById(id: string): Promise<KnowledgeNode | null> {
+  const node = await db.get(`
     SELECT id, name, subject, exam, position_x, position_y, position_z, content_count, status
     FROM knowledge_nodes WHERE id = ?
-  `).get(id) as DBNode | undefined;
+  `, [id]) as DBNode | undefined;
 
-    if (!node) return null;
+  if (!node) return null;
 
-    const connections = db.prepare(`
+  const connectionsResult = await db.query(`
     SELECT to_node_id FROM node_connections WHERE from_node_id = ?
-  `).all(id) as { to_node_id: string }[];
+  `, [id]);
+  const connections = connectionsResult.rows as { to_node_id: string }[];
 
-    return {
-        id: node.id,
-        name: node.name,
-        subject: node.subject as KnowledgeNode['subject'],
-        exam: node.exam as KnowledgeNode['exam'],
-        position: [node.position_x, node.position_y, node.position_z] as [number, number, number],
-        connections: connections.map(c => c.to_node_id),
-        contentCount: node.content_count,
-        status: node.status as KnowledgeNode['status'],
-    };
+  return {
+    id: node.id,
+    name: node.name,
+    subject: node.subject as KnowledgeNode['subject'],
+    exam: node.exam as KnowledgeNode['exam'],
+    position: [node.position_x, node.position_y, node.position_z] as [number, number, number],
+    connections: connections.map(c => c.to_node_id),
+    contentCount: node.content_count,
+    status: node.status as KnowledgeNode['status'],
+  };
 }
 
-export function getNodesByExam(exam: string): KnowledgeNode[] {
-    return getAllNodes().filter(n => n.exam === exam);
+export async function getNodesByExam(exam: string): Promise<KnowledgeNode[]> {
+  // Optimization: Query direct instead of filtering in JS
+  const nodesResult = await db.query(`
+    SELECT id, name, subject, exam, position_x, position_y, position_z, content_count, status
+    FROM knowledge_nodes
+    WHERE exam = ?
+  `, [exam]);
+  const nodes = nodesResult.rows as DBNode[];
+
+  // We still need connections. For simplicity in this optimization, we can fetch all connections (cached?)
+  // Or just fetch connections for these nodes.
+  // Let's just fetch all connections for now to map them, similar to getAllNodes but filtered nodes.
+
+  // Actually, getting connections for just these nodes might be complex in one query without join.
+  // Let's do a join or just fetch all connections. Fetching all connections is cheap if table is small.
+  // Better: Helper function mapping.
+
+  const connectionsResult = await db.query(`
+    SELECT from_node_id, to_node_id FROM node_connections
+    `);
+  const connections = connectionsResult.rows as { from_node_id: string; to_node_id: string }[];
+
+  const connectionMap = new Map<string, string[]>();
+  for (const conn of connections) {
+    if (!connectionMap.has(conn.from_node_id)) {
+      connectionMap.set(conn.from_node_id, []);
+    }
+    connectionMap.get(conn.from_node_id)!.push(conn.to_node_id);
+  }
+
+  return nodes.map(node => ({
+    id: node.id,
+    name: node.name,
+    subject: node.subject as KnowledgeNode['subject'],
+    exam: node.exam as KnowledgeNode['exam'],
+    position: [node.position_x, node.position_y, node.position_z] as [number, number, number],
+    connections: connectionMap.get(node.id) || [],
+    contentCount: node.content_count,
+    status: node.status as KnowledgeNode['status'],
+  }));
 }
 
-export function updateNodeStatus(id: string, status: 'green' | 'yellow' | 'red'): boolean {
-    const result = db.prepare(`
+export async function updateNodeStatus(id: string, status: 'green' | 'yellow' | 'red'): Promise<boolean> {
+  const result = await db.query(`
     UPDATE knowledge_nodes SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-  `).run(status, id);
-    return result.changes > 0;
+  `, [status, id]);
+  return result.rowCount > 0;
 }
 
-export function incrementNodeContent(id: string): boolean {
-    const result = db.prepare(`
+export async function incrementNodeContent(id: string): Promise<boolean> {
+  const result = await db.query(`
     UPDATE knowledge_nodes SET content_count = content_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-  `).run(id);
-    return result.changes > 0;
+  `, [id]);
+  return result.rowCount > 0;
 }

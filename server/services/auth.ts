@@ -1,4 +1,5 @@
-import db, { generateId } from '../db/database.js';
+import db from '../db/index.js';
+import { generateId } from '../db/database.js'; // Keep generating ID locally for now
 import crypto from 'crypto';
 
 export interface User {
@@ -14,13 +15,13 @@ interface DBUser {
     email: string;
     name: string;
     avatar_url: string | null;
-    created_at: string;
+    created_at: string | Date;
 }
 
 interface DBSession {
     id: string;
     user_id: string;
-    expires_at: string;
+    expires_at: string | Date;
 }
 
 // Generate a secure session token
@@ -29,16 +30,16 @@ function generateSessionToken(): string {
 }
 
 // Create or get user by email (for mock Google auth)
-export function createOrGetUser(email: string, name: string, avatarUrl?: string): User {
-    let user = db.prepare(`
+export async function createOrGetUser(email: string, name: string, avatarUrl?: string): Promise<User> {
+    let user = await db.get(`
     SELECT id, email, name, avatar_url, created_at FROM users WHERE email = ?
-  `).get(email) as DBUser | undefined;
+  `, [email]) as DBUser | undefined;
 
     if (!user) {
         const id = generateId();
-        db.prepare(`
+        await db.query(`
       INSERT INTO users (id, email, name, avatar_url) VALUES (?, ?, ?, ?)
-    `).run(id, email, name, avatarUrl || null);
+    `, [id, email, name, avatarUrl || null]);
 
         user = { id, email, name, avatar_url: avatarUrl || null, created_at: new Date().toISOString() };
     }
@@ -53,35 +54,35 @@ export function createOrGetUser(email: string, name: string, avatarUrl?: string)
 }
 
 // Create a new session
-export function createSession(userId: string): { sessionId: string; expiresAt: Date } {
+export async function createSession(userId: string): Promise<{ sessionId: string; expiresAt: Date }> {
     const sessionId = generateSessionToken();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    db.prepare(`
+    await db.query(`
     INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)
-  `).run(sessionId, userId, expiresAt.toISOString());
+  `, [sessionId, userId, expiresAt.toISOString()]);
 
     return { sessionId, expiresAt };
 }
 
 // Validate session and get user
-export function validateSession(sessionId: string): User | null {
-    const session = db.prepare(`
+export async function validateSession(sessionId: string): Promise<User | null> {
+    const session = await db.get(`
     SELECT id, user_id, expires_at FROM sessions WHERE id = ?
-  `).get(sessionId) as DBSession | undefined;
+  `, [sessionId]) as DBSession | undefined;
 
     if (!session) return null;
 
     const expiresAt = new Date(session.expires_at);
     if (expiresAt < new Date()) {
         // Session expired, delete it
-        db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
+        await db.query('DELETE FROM sessions WHERE id = ?', [sessionId]);
         return null;
     }
 
-    const user = db.prepare(`
+    const user = await db.get(`
     SELECT id, email, name, avatar_url, created_at FROM users WHERE id = ?
-  `).get(session.user_id) as DBUser | undefined;
+  `, [session.user_id]) as DBUser | undefined;
 
     if (!user) return null;
 
@@ -95,30 +96,30 @@ export function validateSession(sessionId: string): User | null {
 }
 
 // Delete session (logout)
-export function deleteSession(sessionId: string): boolean {
-    const result = db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
-    return result.changes > 0;
+export async function deleteSession(sessionId: string): Promise<boolean> {
+    const result = await db.query('DELETE FROM sessions WHERE id = ?', [sessionId]);
+    return result.rowCount > 0;
 }
 
 // Delete all sessions for a user
-export function deleteAllUserSessions(userId: string): number {
-    const result = db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
-    return result.changes;
+export async function deleteAllUserSessions(userId: string): Promise<number> {
+    const result = await db.query('DELETE FROM sessions WHERE user_id = ?', [userId]);
+    return result.rowCount;
 }
 
 // Cleanup expired sessions
-export function cleanupExpiredSessions(): number {
-    const result = db.prepare(`
-    DELETE FROM sessions WHERE expires_at < datetime('now')
-  `).run();
-    return result.changes;
+export async function cleanupExpiredSessions(): Promise<number> {
+    const result = await db.query(`
+    DELETE FROM sessions WHERE expires_at < CURRENT_TIMESTAMP
+  `);
+    return result.rowCount;
 }
 
 // Get user by ID
-export function getUserById(id: string): User | null {
-    const user = db.prepare(`
+export async function getUserById(id: string): Promise<User | null> {
+    const user = await db.get(`
     SELECT id, email, name, avatar_url, created_at FROM users WHERE id = ?
-  `).get(id) as DBUser | undefined;
+  `, [id]) as DBUser | undefined;
 
     if (!user) return null;
 
@@ -132,7 +133,7 @@ export function getUserById(id: string): User | null {
 }
 
 // Update user profile
-export function updateUser(id: string, updates: { name?: string; avatarUrl?: string }): boolean {
+export async function updateUser(id: string, updates: { name?: string; avatarUrl?: string }): Promise<boolean> {
     const sets: string[] = [];
     const values: (string | null)[] = [];
 
@@ -147,9 +148,10 @@ export function updateUser(id: string, updates: { name?: string; avatarUrl?: str
 
     if (sets.length === 0) return false;
 
+    // Use current timestamp in standard SQL
     sets.push('updated_at = CURRENT_TIMESTAMP');
     values.push(id);
 
-    const result = db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...values);
-    return result.changes > 0;
+    const result = await db.query(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, values);
+    return result.rowCount > 0;
 }
